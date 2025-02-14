@@ -41,23 +41,3 @@ project-service:
 payment-service:
   host: localhost
   port: 9080
-
-
-api:
-    title: "Post service API"
-    version: "0.1.0.1"
-    description: "Post service gives the ability to write text posts to share your thoughts, knowledge and information with other users."
-
-aws:
-  s3:
-    endpoint: http://127.0.0.1:9000
-    accessKey: user
-    secretKey: password
-    bucket: corpbucket
-    region: us-east-1
-    maxConcurrency: 50
-    connectionTimeout: 60s
-    readTimeout: 60s
-    writeTimeout: 60s
-    apiCallTimeout: 2m
-    apiCallAttemptTimeout: 90s

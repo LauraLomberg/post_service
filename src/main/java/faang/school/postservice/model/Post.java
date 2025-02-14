@@ -17,16 +17,13 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Data
-@ToString(exclude = "likes")
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -85,11 +82,4 @@ public class Post {
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    public List<Like> getLikes() {
-        if (likes == null) {
-            likes = new ArrayList<>();
-        }
-        return likes;
-    }
 }

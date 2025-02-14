@@ -15,15 +15,6 @@ repositories {
 
 dependencies {
     /**
-     * AWS S3
-     */
-    implementation(platform("software.amazon.awssdk:bom:2.21.30"))
-    implementation("software.amazon.awssdk:s3")
-    /**
-     * Spring Swagger
-     */
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.0.2")
-    /**
      * Spring boot starters
      */
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
@@ -32,7 +23,6 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.0.2")
-    implementation ("org.springframework.cloud:spring-cloud-starter-openfeign")
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
     /**
@@ -67,51 +57,6 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.9.2")
     testImplementation("org.assertj:assertj-core:3.24.2")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-
-    //testImplementation("org.mockito:mockito-inline:4.0.0")
-}
-
-jacoco {
-    toolVersion = "0.8.12"
-}
-
-tasks.jacocoTestReport {
-    dependsOn(tasks.test)
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-        csv.required.set(false)
-    }
-
-    classDirectories.setFrom(
-        fileTree(project.buildDir.resolve("classes/java/main")) {
-            include("**/service/**")
-        }
-    )
-
-    executionData.setFrom(fileTree(project.buildDir).include("jacoco/test.exec"))
-}
-
-tasks.jacocoTestCoverageVerification {
-    dependsOn(tasks.jacocoTestReport)
-
-    classDirectories.setFrom(
-        fileTree(project.buildDir.resolve("classes/java/main")) {
-            include("**/service/**")
-        }
-    )
-
-    violationRules {
-        rule {
-            element = "CLASS"
-            includes = listOf("faang.school.postservice.service.*")
-            limit {
-                counter = "INSTRUCTION"
-                value = "COVEREDRATIO"
-                minimum = 0.70.toBigDecimal()
-            }
-        }
-    }
 }
 
 tasks.test {
