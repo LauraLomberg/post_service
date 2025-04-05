@@ -1,8 +1,8 @@
 package faang.school.postservice.repository;
 
 import faang.school.postservice.model.Post;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import jakarta.transaction.Transactional;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
@@ -26,4 +26,10 @@ public interface PostRepository extends CrudRepository<Post, Long> {
 
     @Query(value = "SELECT * FROM Post p WHERE p.verified = FALSE AND p.verified_date IS NULL ORDER BY p.created_at ASC LIMIT :limit" , nativeQuery = true)
     List<Post> findUnverifiedPosts(@Param("limit") int limit);
+
+    @Modifying
+    @Transactional
+    @Query(nativeQuery = true,
+            value = "DELETE from post_tag WHERE post_tag.post_id = :postId AND post_tag.tag_id in(:tagsId)")
+    void deleteTagsFromPost(Long postId, List<Long> tagsId);
 }

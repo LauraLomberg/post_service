@@ -2,6 +2,7 @@ package faang.school.postservice.service;
 
 import faang.school.postservice.dto.PostDto;
 import faang.school.postservice.exception.NotFoundException;
+import faang.school.postservice.exception.PostNotFoundException;
 import faang.school.postservice.mapper.PostMapperImpl;
 import faang.school.postservice.model.Post;
 import faang.school.postservice.repository.PostRepository;
@@ -273,5 +274,31 @@ class PostServiceTest {
 
         verify(postRepository, times(3)).findUnverifiedPosts(2);
         verify(postRepository, times(3)).save(any());
+    }
+
+    @Test
+    public void testFindPostByIdThrowPostNotFoundException() {
+        when(postRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(PostNotFoundException.class, () -> postService.findPostById(1L));
+    }
+
+    @Test
+    public void testFindPostById() {
+        when(postRepository.findById(1L)).thenReturn(Optional.of(post));
+
+        Post actualResult = postService.findPostById(1L);
+
+        assertNotNull(actualResult);
+        assertEquals(postDto.getContent(), actualResult.getContent());
+        assertEquals(postDto.getAuthorId(), actualResult.getAuthorId());
+        verify(postRepository, times(1)).findById(1L);
+    }
+
+    @Test
+    public void testRemoveTagsFromPost() {
+        postService.removeTagsFromPost(1L, List.of(1L, 2L));
+
+        verify(postRepository, times(1)).deleteTagsFromPost(1L, List.of(1L, 2L));
     }
 }

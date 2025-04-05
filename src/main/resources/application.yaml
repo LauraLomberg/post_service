@@ -51,6 +51,9 @@ project-service:
 payment-service:
   host: localhost
   port: 9080
+post-service:
+  tag:
+    count-of-most-popular-tags: 2
 
 app:
   scheduling:
@@ -59,6 +62,3 @@ app:
       max-posts-per-time: 10
   dictionary:
     post-dictionary-path: /dictionary/post-forbidden-words.txt
-post-service:
-  tag:
-    count-of-most-popular-tags: 2
