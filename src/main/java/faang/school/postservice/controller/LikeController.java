@@ -21,15 +21,15 @@ public class LikeController {
     @PostMapping("/posts/{postId}/users/{userId}")
     public ResponseEntity<LikeDto> likePost(@PathVariable Long userId,
                                             @PathVariable Long postId) {
-        LikeDto response = likeService.likePost(userId, postId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(likeService.likePost(userId, postId));
     }
 
     @PostMapping("/comments/{commentId}/users/{userId}")
     public ResponseEntity<LikeDto> likeComment(@PathVariable Long userId,
                                                @PathVariable Long commentId) {
-        LikeDto response = likeService.likeComment(userId, commentId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(likeService.likeComment(userId, commentId));
     }
 
     @DeleteMapping("/posts/{postId}/users/{userId}")
