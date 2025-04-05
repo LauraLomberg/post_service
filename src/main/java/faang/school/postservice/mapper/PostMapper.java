@@ -16,6 +16,7 @@ public interface PostMapper {
     @Mapping(target = "resources", ignore = true)
     @Mapping(target = "verified", ignore = true)
     @Mapping(target = "verifiedDate", ignore = true)
+    @Mapping(target = "tags", ignore = true)
     Post toEntity(PostDto postDto);
 
     PostDto toDto(Post post);
@@ -28,5 +29,6 @@ public interface PostMapper {
     @Mapping(target = "resources", ignore = true)
     @Mapping(target = "verified", ignore = true)
     @Mapping(target = "verifiedDate", ignore = true)
+    @Mapping(target = "tags", ignore = true)
     void update(PostDto postDto, @MappingTarget Post post);
 }

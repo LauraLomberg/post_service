@@ -1,6 +1,7 @@
 package faang.school.postservice.service;
 
 import faang.school.postservice.dto.PostDto;
+import faang.school.postservice.model.Post;
 
 import java.util.List;
 
@@ -25,4 +26,8 @@ public interface PostService {
     List<PostDto> getAllPublishedPostsByProjectId(Long projectId);
 
     void moderatePosts();
+
+    Post findPostById(Long id);
+
+    void removeTagsFromPost(Long postId, List<Long> tagsId);
 }
