@@ -12,10 +12,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -29,8 +34,14 @@ class PostServiceTest {
     @Spy
     private PostMapperImpl postMapper;
 
+    @Mock
+    private ThreadPoolTaskScheduler taskScheduler;
+
+    @Mock
+    private PostModerationDictionaryImpl moderationDictionary;
+
     @InjectMocks
-    private PostService postService;
+    private PostServiceImpl postService;
 
     private PostDto postDto;
     private Post post;
@@ -220,5 +231,47 @@ class PostServiceTest {
         assertEquals(postDto.getContent(), result.get(0).getContent());
         verify(postRepository).findByProjectId(1L);
         verify(postMapper).toDto(post);
+    }
+
+    @Test
+    public void testModeratePostsWithNoPosts() {
+        ReflectionTestUtils.setField(postService, "limitToModerate", 2);
+        when(postRepository.findUnverifiedPosts(2)).thenReturn(Collections.emptyList());
+
+        postService.moderatePosts();
+
+        verify(postRepository, times(1)).findUnverifiedPosts(2);
+        verifyNoMoreInteractions(postRepository);
+    }
+
+    @Test
+    public void testModeratePostsWithOnePackOfPosts() {
+        ReflectionTestUtils.setField(postService, "limitToModerate", 2);
+        ScheduledExecutorService realExecutor = Executors.newScheduledThreadPool(2);
+        when(taskScheduler.getScheduledExecutor()).thenReturn(realExecutor);
+        when(postRepository.findUnverifiedPosts(2))
+                .thenReturn(List.of(post, post))
+                .thenReturn(Collections.emptyList());
+
+        postService.moderatePosts();
+
+        verify(postRepository, times(2)).findUnverifiedPosts(2);
+        verify(postRepository, times(2)).save(any());
+    }
+
+    @Test
+    public void testModeratePostsWithSomePacksOfPosts() {
+        ReflectionTestUtils.setField(postService, "limitToModerate", 2);
+        ScheduledExecutorService realExecutor = Executors.newScheduledThreadPool(2);
+        when(taskScheduler.getScheduledExecutor()).thenReturn(realExecutor);
+        when(postRepository.findUnverifiedPosts(2))
+                .thenReturn(List.of(post, post))
+                .thenReturn(List.of(post))
+                .thenReturn(Collections.emptyList());
+
+        postService.moderatePosts();
+
+        verify(postRepository, times(3)).findUnverifiedPosts(2);
+        verify(postRepository, times(3)).save(any());
     }
 }

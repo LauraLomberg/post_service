@@ -1,8 +1,11 @@
 package faang.school.postservice.repository;
 
 import faang.school.postservice.model.Post;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -21,4 +24,6 @@ public interface PostRepository extends CrudRepository<Post, Long> {
     @Query("SELECT p FROM Post p WHERE p.published = false AND p.deleted = false AND p.scheduledAt <= CURRENT_TIMESTAMP")
     List<Post> findReadyToPublish();
 
+    @Query(value = "SELECT * FROM Post p WHERE p.verified = FALSE AND p.verified_date IS NULL ORDER BY p.created_at ASC LIMIT :limit" , nativeQuery = true)
+    List<Post> findUnverifiedPosts(@Param("limit") int limit);
 }

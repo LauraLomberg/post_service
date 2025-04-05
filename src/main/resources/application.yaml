@@ -1,9 +1,19 @@
 spring:
+  mvc:
+    servlet:
+      path: /api/v1
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5432/postgres
     username: user
     password: password
+  scheduling:
+    thread-name-prefix: scheduler-
+    pool:
+      size: 10
+    shutdown:
+      await-termination: true
+      await-termination-period: 30
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
@@ -41,3 +51,14 @@ project-service:
 payment-service:
   host: localhost
   port: 9080
+
+app:
+  scheduling:
+    daily-midnight-cron: "0 0 0 * * *" # Каждый день в 00:00
+    post:
+      max-posts-per-time: 10
+  dictionary:
+    post-dictionary-path: /dictionary/post-forbidden-words.txt
+post-service:
+  tag:
+    count-of-most-popular-tags: 2
