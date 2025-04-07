@@ -13,13 +13,17 @@ import faang.school.postservice.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,12 +38,17 @@ public class PostServiceImpl implements PostService {
     private final ProjectServiceClient projectServiceClient;
     private final ThreadPoolTaskScheduler taskScheduler;
     private final PostModerationDictionaryImpl moderationDictionary;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final ChannelTopic channelTopic;
 
     @Value("${app.scheduling.post.max-posts-per-time}")
     private int limitToModerate;
 
+    @Value("${post-service.post.count-of-unverified-posts-to-ban}")
+    private int countOfUnverifiedPostsToBan;
+
     public PostDto createDraft(PostDto postDto) {
-//        validatePostDto(postDto); TODO: remove the // when UserController and ProjectController are ready
+        validatePostDto(postDto);
         Post post = postMapper.toEntity(postDto);
         post.setPublished(false);
         post = postRepository.save(post);
@@ -58,7 +67,7 @@ public class PostServiceImpl implements PostService {
     }
 
     public PostDto updatePost(Long postId, PostDto postDto) {
-//        validatePostDto(postDto); TODO: remove the // when UserController and ProjectController are ready
+        validatePostDto(postDto);
         Post post = postRepository.findById(postId).orElseThrow(() -> new NotFoundException(POST_NOT_EXIST));
         if (postDto.getAuthorId() != null && !postDto.getAuthorId().equals(post.getAuthorId())) {
             throw new IllegalArgumentException("Cannot change the author of the post");
@@ -151,6 +160,21 @@ public class PostServiceImpl implements PostService {
         postRepository.deleteTagsFromPost(postId, tagsId);
     }
 
+    public void banUsersWithTooManyOffendedPosts() {
+        List<Post> rejectedPosts = postRepository.findByVerifiedFalse();
+
+        Map<Long, Long> authorRejectedCount = rejectedPosts.stream()
+                .collect(Collectors.groupingBy(Post::getAuthorId, Collectors.counting()));
+
+        List<Long> userIdsToBan = authorRejectedCount.entrySet().stream()
+                .filter(user -> user.getValue() > countOfUnverifiedPostsToBan)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        userIdsToBan.forEach(userId -> redisTemplate.convertAndSend(channelTopic.getTopic(), userId.toString()));
+        log.info("Information to ban intruders has been sent via redis");
+    }
+
     private void validatePostDto(PostDto postDto) {
         if (postDto.getAuthorId() != null && postDto.getProjectId() != null) {
             throw new IllegalArgumentException("Post can have only one author: either user or project");
@@ -161,11 +185,12 @@ public class PostServiceImpl implements PostService {
                 throw new NotFoundException("Author doesn't exist");
             }
         }
-        if (postDto.getProjectId() != null) {
-            ProjectDto projectDto = projectServiceClient.getProject(postDto.getProjectId());
-            if (projectDto == null) {
-                throw new NotFoundException("Project doesn't exist");
-            }
-        }
+//        TODO: remove // when ProjectService has necessary Controller
+//        if (postDto.getProjectId() != null) {
+//            ProjectDto projectDto = projectServiceClient.getProject(postDto.getProjectId());
+//            if (projectDto == null) {
+//                throw new NotFoundException("Project doesn't exist");
+//            }
+//        }
     }
 }

@@ -1,6 +1,8 @@
 package faang.school.postservice.service;
 
+import faang.school.postservice.client.UserServiceClient;
 import faang.school.postservice.dto.PostDto;
+import faang.school.postservice.dto.user.UserDto;
 import faang.school.postservice.exception.NotFoundException;
 import faang.school.postservice.exception.PostNotFoundException;
 import faang.school.postservice.mapper.PostMapperImpl;
@@ -13,6 +15,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -41,8 +45,19 @@ class PostServiceTest {
     @Mock
     private PostModerationDictionaryImpl moderationDictionary;
 
+    @Mock
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Mock
+    private ChannelTopic channelTopic;
+
+    @Mock
+    private UserServiceClient userServiceClient;
+
     @InjectMocks
     private PostServiceImpl postService;
+
+    private final int countOfUnverifiedPostsToBan = 2;
 
     private PostDto postDto;
     private Post post;
@@ -70,6 +85,8 @@ class PostServiceTest {
     @Test
     public void testCreateDraft() {
         when(postRepository.save(any(Post.class))).thenReturn(post);
+        when(userServiceClient.getUser(postDto.getAuthorId()))
+                .thenReturn(new UserDto(1L, "Rick", "test"));
 
         PostDto result = postService.createDraft(postDto);
 
@@ -115,6 +132,8 @@ class PostServiceTest {
                 .build();
 
         when(postRepository.findById(1L)).thenReturn(Optional.of(post));
+        when(userServiceClient.getUser(postDto.getAuthorId()))
+                .thenReturn(new UserDto(1L, "Rick", "test"));
         when(postRepository.save(post)).thenReturn(post);
 
         PostDto result = postService.updatePost(1L, updatedPostDto);
@@ -133,8 +152,10 @@ class PostServiceTest {
                 .content("Updated content")
                 .authorId(2L)
                 .build();
-
+        UserDto userDto = new UserDto(2L, "Rick", "test");
+        when(userServiceClient.getUser(2L)).thenReturn(userDto);
         when(postRepository.findById(1L)).thenReturn(Optional.of(post));
+
 
         assertThrows(IllegalArgumentException.class, () -> postService.updatePost(1L, updatedPostDto));
         verify(postRepository).findById(1L);
@@ -300,5 +321,25 @@ class PostServiceTest {
         postService.removeTagsFromPost(1L, List.of(1L, 2L));
 
         verify(postRepository, times(1)).deleteTagsFromPost(1L, List.of(1L, 2L));
+    }
+
+    @Test
+    public void testBanUserWithTooManyOffendedPostsWithNoRejectedPosts() {
+        when(postRepository.findByVerifiedFalse()).thenReturn(Collections.emptyList());
+
+        postService.banUsersWithTooManyOffendedPosts();
+
+        verify(redisTemplate, never()).convertAndSend(anyString(), any());
+    }
+
+    @Test
+    public void testBanUserWithTooManyOffendedPostsSuccessfully() {
+        post.setAuthorId(1L);
+        when(postRepository.findByVerifiedFalse()).thenReturn(List.of(post, post, post));
+        when(channelTopic.getTopic()).thenReturn("ban-users");
+
+        postService.banUsersWithTooManyOffendedPosts();
+
+        verify(redisTemplate, times(1)).convertAndSend(anyString(), any());
     }
 }

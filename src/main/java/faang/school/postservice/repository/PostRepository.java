@@ -27,6 +27,9 @@ public interface PostRepository extends CrudRepository<Post, Long> {
     @Query(value = "SELECT * FROM Post p WHERE p.verified = FALSE AND p.verified_date IS NULL ORDER BY p.created_at ASC LIMIT :limit" , nativeQuery = true)
     List<Post> findUnverifiedPosts(@Param("limit") int limit);
 
+    @Query("SELECT p FROM Post p WHERE p.verified = false and p.verifiedDate IS NOT NULL")
+    List<Post> findByVerifiedFalse();
+
     @Modifying
     @Transactional
     @Query(nativeQuery = true,
