@@ -2,7 +2,7 @@ package faang.school.postservice.controller;
 
 import faang.school.postservice.dto.PostDto;
 import faang.school.postservice.exception.DataValidationException;
-import faang.school.postservice.service.PostService;
+import faang.school.postservice.service.PostServiceImpl;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -23,7 +23,7 @@ import java.util.List;
 @Validated
 public class PostController {
 
-    private final PostService postService;
+    private final PostServiceImpl postService;
 
     @PostMapping
     public PostDto createDraft(@RequestBody PostDto postDto) {

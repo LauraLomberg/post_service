@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class PostServiceTest {
+class PostServiceImplTest {
 
     @Mock
     private PostRepository postRepository;
@@ -31,7 +31,7 @@ class PostServiceTest {
     private PostMapperImpl postMapper;
 
     @InjectMocks
-    private PostService postService;
+    private PostServiceImpl postServiceImpl;
 
     private PostDto postDto;
     private Post post;
@@ -60,7 +60,7 @@ class PostServiceTest {
     public void testCreateDraft() {
         when(postRepository.save(any(Post.class))).thenReturn(post);
 
-        PostDto result = postService.createDraft(postDto);
+        PostDto result = postServiceImpl.createDraft(postDto);
 
         assertNotNull(result);
         assertEquals(postDto.getContent(), result.getContent());
@@ -75,7 +75,7 @@ class PostServiceTest {
         when(postRepository.findById(1L)).thenReturn(Optional.of(post));
         when(postRepository.save(post)).thenReturn(post);
 
-        PostDto result = postService.publishPost(1L);
+        PostDto result = postServiceImpl.publishPost(1L);
 
         assertNotNull(result);
         assertTrue(post.isPublished());
@@ -90,7 +90,7 @@ class PostServiceTest {
         post.setPublished(true);
         when(postRepository.findById(1L)).thenReturn(Optional.of(post));
 
-        assertThrows(IllegalStateException.class, () -> postService.publishPost(1L));
+        assertThrows(IllegalStateException.class, () -> postServiceImpl.publishPost(1L));
         verify(postRepository).findById(1L);
         verify(postRepository, never()).save(post);
     }
@@ -106,7 +106,7 @@ class PostServiceTest {
         when(postRepository.findById(1L)).thenReturn(Optional.of(post));
         when(postRepository.save(post)).thenReturn(post);
 
-        PostDto result = postService.updatePost(1L, updatedPostDto);
+        PostDto result = postServiceImpl.updatePost(1L, updatedPostDto);
 
         assertNotNull(result);
         assertEquals("Updated content", result.getContent());
@@ -125,7 +125,7 @@ class PostServiceTest {
 
         when(postRepository.findById(1L)).thenReturn(Optional.of(post));
 
-        assertThrows(IllegalArgumentException.class, () -> postService.updatePost(1L, updatedPostDto));
+        assertThrows(IllegalArgumentException.class, () -> postServiceImpl.updatePost(1L, updatedPostDto));
         verify(postRepository).findById(1L);
         verify(postRepository, never()).save(post);
     }
@@ -135,7 +135,7 @@ class PostServiceTest {
         when(postRepository.findById(1L)).thenReturn(Optional.of(post));
         when(postRepository.save(post)).thenReturn(post);
 
-        PostDto result = postService.softDelete(1L);
+        PostDto result = postServiceImpl.softDelete(1L);
 
         assertNotNull(result);
         assertTrue(post.isDeleted());
@@ -150,7 +150,7 @@ class PostServiceTest {
 
         when(postRepository.findByIdWithLikes(1L)).thenReturn(Optional.of(post));
 
-        PostDto result = postService.getPostById(1L);
+        PostDto result = postServiceImpl.getPostById(1L);
 
         assertNotNull(result);
         assertEquals(postDto.getContent(), result.getContent());
@@ -164,7 +164,7 @@ class PostServiceTest {
     public void testGetPostByIdNotFound() {
         when(postRepository.findByIdWithLikes(1L)).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundException.class, () -> postService.getPostById(1L));
+        assertThrows(NotFoundException.class, () -> postServiceImpl.getPostById(1L));
         verify(postRepository).findByIdWithLikes(1L);
     }
 
@@ -172,7 +172,7 @@ class PostServiceTest {
     public void testGetAllDraftsByAuthorId() {
         when(postRepository.findByAuthorId(1L)).thenReturn(List.of(post));
 
-        List<PostDto> result = postService.getAllDraftsByAuthorId(1L);
+        List<PostDto> result = postServiceImpl.getAllDraftsByAuthorId(1L);
 
         assertNotNull(result);
         assertEquals(1, result.size());
@@ -185,7 +185,7 @@ class PostServiceTest {
     public void testGetAllDraftsByProjectId() {
         when(postRepository.findByProjectId(1L)).thenReturn(List.of(post));
 
-        List<PostDto> result = postService.getAllDraftsByProjectId(1L);
+        List<PostDto> result = postServiceImpl.getAllDraftsByProjectId(1L);
 
         assertNotNull(result);
         assertEquals(1, result.size());
@@ -202,7 +202,7 @@ class PostServiceTest {
 
         when(postRepository.findByAuthorIdWithLikes(1L)).thenReturn(List.of(post));
 
-        List<PostDto> result = postService.getAllPublishedPostsByAuthorId(1L);
+        List<PostDto> result = postServiceImpl.getAllPublishedPostsByAuthorId(1L);
 
         assertNotNull(result);
         assertEquals(1, result.size());
@@ -220,7 +220,7 @@ class PostServiceTest {
 
         when(postRepository.findByProjectIdWithLikes(1L)).thenReturn(List.of(post));
 
-        List<PostDto> result = postService.getAllPublishedPostsByProjectId(1L);
+        List<PostDto> result = postServiceImpl.getAllPublishedPostsByProjectId(1L);
 
         assertNotNull(result);
         assertEquals(1, result.size());
