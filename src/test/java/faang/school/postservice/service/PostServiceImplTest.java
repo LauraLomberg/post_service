@@ -235,14 +235,14 @@ class PostServiceImplTest {
     public void testFindPostByIdThrowPostNotFoundException() {
         when(postRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(PostNotFoundException.class, () -> postService.findPostById(1L));
+        assertThrows(PostNotFoundException.class, () -> postServiceImpl.findPostById(1L));
     }
 
     @Test
     public void testFindPostById() {
         when(postRepository.findById(1L)).thenReturn(Optional.of(post));
 
-        Post actualResult = postService.findPostById(1L);
+        Post actualResult = postServiceImpl.findPostById(1L);
 
         assertNotNull(actualResult);
         assertEquals(postDto.getContent(), actualResult.getContent());
@@ -252,7 +252,7 @@ class PostServiceImplTest {
 
     @Test
     public void testRemoveTagsFromPost() {
-        postService.removeTagsFromPost(1L, List.of(1L, 2L));
+        postServiceImpl.removeTagsFromPost(1L, List.of(1L, 2L));
 
         verify(postRepository, times(1)).deleteTagsFromPost(1L, List.of(1L, 2L));
     }

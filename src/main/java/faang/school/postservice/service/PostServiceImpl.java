@@ -6,6 +6,7 @@ import faang.school.postservice.dto.PostDto;
 import faang.school.postservice.dto.project.ProjectDto;
 import faang.school.postservice.dto.user.UserDto;
 import faang.school.postservice.exception.NotFoundException;
+import faang.school.postservice.exception.PostNotFoundException;
 import faang.school.postservice.mapper.PostMapper;
 import faang.school.postservice.model.Post;
 import faang.school.postservice.repository.PostRepository;
@@ -133,4 +134,16 @@ public class PostServiceImpl implements PostService {
             }
         }
     }
+
+    @Override
+    public Post findPostById(Long id) {
+        return postRepository.findById(id)
+                .orElseThrow(() -> new PostNotFoundException("Post with id: " + id + " not found"));
+    }
+
+    @Override
+    public void removeTagsFromPost(Long postId, List<Long> tagsId) {
+        postRepository.deleteTagsFromPost(postId, tagsId);
+    }
 }
+
