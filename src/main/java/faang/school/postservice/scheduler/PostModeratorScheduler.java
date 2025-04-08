@@ -16,7 +16,6 @@ public class PostModeratorScheduler implements Moderator {
 
     @Scheduled(cron = "${app.scheduling.daily-midnight-cron}")
     @Override
-    @Transactional
     public void startModerate() {
         log.info("Post moderation started");
         try {

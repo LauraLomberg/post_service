@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class AuthorBanner implements Banner {
+public class AuthorBanner {
 
     private final PostService postService;
 
