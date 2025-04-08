@@ -64,8 +64,8 @@ post-service:
 
 app:
   scheduling:
-    daily-midnight-cron: "0 0 1 * * ?" # Every day at 00:00
-    daily-one-am-cron: "*/30 * * * * *" # Every day at 01:00
+    daily-midnight-cron: "0 0 0 * * ?" # Every day at 00:00
+    daily-one-am-cron: "0 0 1 * * ?" # Every day at 01:00
     post:
       max-posts-per-time: 10
   dictionary:
