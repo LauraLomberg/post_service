@@ -2,6 +2,7 @@ package faang.school.postservice.service;
 
 import faang.school.postservice.client.UserServiceClient;
 import faang.school.postservice.dto.PostDto;
+import faang.school.postservice.exception.EntityNotFoundException;
 import faang.school.postservice.dto.user.UserDto;
 import faang.school.postservice.exception.NotFoundException;
 import faang.school.postservice.exception.PostNotFoundException;
@@ -156,7 +157,6 @@ class PostServiceTest {
         when(userServiceClient.getUser(2L)).thenReturn(userDto);
         when(postRepository.findById(1L)).thenReturn(Optional.of(post));
 
-
         assertThrows(IllegalArgumentException.class, () -> postService.updatePost(1L, updatedPostDto));
         verify(postRepository).findById(1L);
         verify(postRepository, never()).save(post);
@@ -295,6 +295,34 @@ class PostServiceTest {
 
         verify(postRepository, times(3)).findUnverifiedPosts(2);
         verify(postRepository, times(3)).save(any());
+    }
+
+    @Test
+    void testGetPostEntryByIdSuccessfulFetch() {
+        long postId = 1L;
+        Post post = new Post();
+        post.setId(postId);
+
+        when(postRepository.findById(postId)).thenReturn(Optional.of(post));
+
+        Post result = postService.getPostEntryById(postId);
+
+        assertNotNull(result);
+        assertEquals(postId, result.getId());
+        verify(postRepository, times(1)).findById(postId);
+    }
+
+    @Test
+    void testGetPostEntryByIdPostNotFound() {
+        long postId = 2L;
+
+        when(postRepository.findById(postId)).thenReturn(Optional.empty());
+
+        EntityNotFoundException exception = assertThrows(
+                EntityNotFoundException.class,
+                () -> postService.getPostEntryById(postId)
+        );
+        assertEquals("Post not found", exception.getMessage());
     }
 
     @Test
