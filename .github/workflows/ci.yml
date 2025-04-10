@@ -21,7 +21,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build and test with Gradle
-        run: ./gradlew clean test jacocoTestReport
+        run: ./gradlew clean test -Dspring.profiles.active=test
 
       - name: Upload JaCoCo report (optional)
         uses: actions/upload-artifact@v4
