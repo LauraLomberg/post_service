@@ -26,7 +26,6 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            ~/.gradle/daemon
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
@@ -34,14 +33,31 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build and test
-        run: ./gradlew clean build test jacocoTestReport jacocoTestCoverageVerification --no-daemon --stacktrace
+      - name: Run unit tests
+        run: ./gradlew clean test --tests "*UnitTest" --no-daemon --stacktrace
 
-      - name: Upload JaCoCo Report
+      - name: Run integration tests with mocks
+        run: ./gradlew test --tests "*IT" -Dspring.profiles.active=test --no-daemon --stacktrace
+        env:
+          SPRING_PROFILES_ACTIVE: test
+
+      - name: Build and generate coverage reports
+        if: success()
+        run: ./gradlew build jacocoTestReport jacocoTestCoverageVerification --no-daemon
+
+      - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: jacoco-report
+          name: test-reports
           path: |
-            build/reports/jacoco/test
             build/reports/tests/test
+            build/reports/jacoco/test
+
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            build/libs/*.jar
