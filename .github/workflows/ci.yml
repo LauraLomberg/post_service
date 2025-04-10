@@ -1,4 +1,4 @@
-name: Java CI with Gradle
+name: PostService CI
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -24,7 +24,7 @@ jobs:
         run: ./gradlew clean test jacocoTestReport
 
       - name: Upload JaCoCo report (optional)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jacoco-report
           path: build/reports/jacoco/test/html/
