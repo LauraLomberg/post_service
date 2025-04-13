@@ -1,8 +1,8 @@
 package faang.school.postservice.service;
 
 import faang.school.postservice.dto.PostDto;
-import faang.school.postservice.exception.PostNotFoundException;
 import faang.school.postservice.model.Post;
+import jakarta.validation.constraints.Min;
 
 import java.util.List;
 
@@ -25,6 +25,8 @@ public interface PostService {
     List<PostDto> getAllPublishedPostsByAuthorId(Long authorId);
 
     List<PostDto> getAllPublishedPostsByProjectId(Long projectId);
+
+    Post getPostEntryById(@Min(1) long id);
 
     Post findPostById(Long id);
 
