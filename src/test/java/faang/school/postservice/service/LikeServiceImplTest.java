@@ -1,6 +1,7 @@
 package faang.school.postservice.service;
 
-import faang.school.postservice.dto.LikeDto;
+import faang.school.postservice.dto.CommentLikeDto;
+import faang.school.postservice.dto.PostLikeDto;
 import faang.school.postservice.exception.NotFoundException;
 import faang.school.postservice.mapper.LikeMapperImpl;
 import faang.school.postservice.model.Comment;
@@ -63,11 +64,17 @@ public class LikeServiceImplTest {
     void testLikePost() {
         when(postRepository.findById(postId)).thenReturn(Optional.of(post));
         when(likeRepository.existsByPostIdAndUserId(postId, userId)).thenReturn(false);
-        when(likeRepository.save(any(Like.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(likeRepository.save(any(Like.class))).thenAnswer(invocation -> {
+            Like like = invocation.getArgument(0);
+            like.setPost(post);
+            return like;
+        });
 
-        LikeDto likeDto = likeServiceImpl.likePost(userId, postId);
+        PostLikeDto dto = likeServiceImpl.likePost(userId, postId);
 
-        assertNotNull(likeDto);
+        assertNotNull(dto);
+        assertEquals(postId, dto.getPostId());
+        assertEquals(userId, dto.getUserId());
         verify(postRepository).findById(postId);
         verify(likeRepository).save(any(Like.class));
     }
@@ -76,11 +83,17 @@ public class LikeServiceImplTest {
     void testLikeComment() {
         when(commentRepository.findById(commentId)).thenReturn(Optional.of(comment));
         when(likeRepository.existsByCommentIdAndUserId(commentId, userId)).thenReturn(false);
-        when(likeRepository.save(any(Like.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(likeRepository.save(any(Like.class))).thenAnswer(invocation -> {
+            Like like = invocation.getArgument(0);
+            like.setComment(comment);
+            return like;
+        });
 
-        LikeDto likeDto = likeServiceImpl.likeComment(userId, commentId);
+        CommentLikeDto dto = likeServiceImpl.likeComment(userId, commentId);
 
-        assertNotNull(likeDto);
+        assertNotNull(dto);
+        assertEquals(commentId, dto.getCommentId());
+        assertEquals(userId, dto.getUserId());
         verify(commentRepository).findById(commentId);
         verify(likeRepository).save(any(Like.class));
     }

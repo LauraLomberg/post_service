@@ -5,12 +5,11 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class LikeDto {
+public class PostLikeDto {
 
     private Long id;
     private Long userId;
     private Long postId;
-    private Long commentId;
     private LocalDateTime createdAt;
 }
 

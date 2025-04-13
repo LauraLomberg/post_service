@@ -1,6 +1,7 @@
 package faang.school.postservice.controller;
 
-import faang.school.postservice.dto.LikeDto;
+import faang.school.postservice.dto.CommentLikeDto;
+import faang.school.postservice.dto.PostLikeDto;
 import faang.school.postservice.service.LikeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,15 +20,15 @@ public class LikeController {
     private final LikeService likeService;
 
     @PostMapping("/posts/{postId}/users/{userId}")
-    public ResponseEntity<LikeDto> likePost(@PathVariable Long userId,
-                                            @PathVariable Long postId) {
+    public ResponseEntity<PostLikeDto> likePost(@PathVariable Long userId,
+                                                @PathVariable Long postId) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(likeService.likePost(userId, postId));
     }
 
     @PostMapping("/comments/{commentId}/users/{userId}")
-    public ResponseEntity<LikeDto> likeComment(@PathVariable Long userId,
-                                               @PathVariable Long commentId) {
+    public ResponseEntity<CommentLikeDto> likeComment(@PathVariable Long userId,
+                                                      @PathVariable Long commentId) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(likeService.likeComment(userId, commentId));
     }

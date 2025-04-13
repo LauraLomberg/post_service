@@ -1,7 +1,8 @@
 package faang.school.postservice.service;
 
 import faang.school.postservice.client.UserServiceClient;
-import faang.school.postservice.dto.LikeDto;
+import faang.school.postservice.dto.CommentLikeDto;
+import faang.school.postservice.dto.PostLikeDto;
 import faang.school.postservice.exception.NotFoundException;
 import faang.school.postservice.mapper.LikeMapper;
 import faang.school.postservice.model.Comment;
@@ -28,40 +29,42 @@ public class LikeServiceImpl implements LikeService {
 
     @Transactional
     @Override
-    public LikeDto likePost(Long userId, Long postId) {
+    public PostLikeDto likePost(Long userId, Long postId) {
         validateUser(userId);
         checkLikeDoesNotExist(postId, userId, true);
 
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post with ID " + postId + " not found"));
 
-        Like like = new Like();
-        like.setPost(post);
-        like.setUserId(userId);
+        Like like = Like.builder()
+                .userId(userId)
+                .post(post)
+                .build();
 
         like = likeRepository.save(like);
         log.info("User {} liked post {}", userId, postId);
 
-        return likeMapper.toDto(like);
+        return likeMapper.toPostLikeDto(like);
     }
 
     @Transactional
     @Override
-    public LikeDto likeComment(Long userId, Long commentId) {
+    public CommentLikeDto likeComment(Long userId, Long commentId) {
         validateUser(userId);
         checkLikeDoesNotExist(commentId, userId, false);
 
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new NotFoundException("Comment with ID " + commentId + " not found"));
 
-        Like like = new Like();
-        like.setComment(comment);
-        like.setUserId(userId);
+        Like like = Like.builder()
+                .userId(userId)
+                .comment(comment)
+                .build();
 
         like = likeRepository.save(like);
         log.info("User {} liked comment {}", userId, commentId);
 
-        return likeMapper.toDto(like);
+        return likeMapper.toCommentLikeDto(like);
     }
 
     @Transactional
