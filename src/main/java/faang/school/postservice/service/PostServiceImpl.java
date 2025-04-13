@@ -124,6 +124,7 @@ public class PostServiceImpl implements PostService {
                 .sorted(Comparator.comparing(Post::getPublishedAt).reversed())
                 .map(postMapper::toDto)
                 .toList();
+    }
 
     public Post getPostEntryById(@Min(1) long id) {
         log.debug("Fetching post with ID: {}", id);
