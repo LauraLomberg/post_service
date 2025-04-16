@@ -17,11 +17,7 @@ public class PostModeratorScheduler implements Moderator {
     @Override
     public void startModerate() {
         log.info("Post moderation started");
-        try {
-            postService.moderatePosts();
-            log.info("All posts have been moderated");
-        } catch (Exception e) {
-            log.error("Moderation failed ", e);
-        }
+        postService.moderatePosts();
+        log.info("All posts have been moderated");
     }
 }

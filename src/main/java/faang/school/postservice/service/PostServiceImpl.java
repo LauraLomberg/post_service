@@ -3,7 +3,6 @@ package faang.school.postservice.service;
 import faang.school.postservice.client.ProjectServiceClient;
 import faang.school.postservice.client.UserServiceClient;
 import faang.school.postservice.dto.PostDto;
-import faang.school.postservice.dto.project.ProjectDto;
 import faang.school.postservice.dto.user.UserDto;
 import faang.school.postservice.exception.EntityNotFoundException;
 import faang.school.postservice.exception.NotFoundException;
@@ -203,6 +202,7 @@ public class PostServiceImpl implements PostService {
                 .filter(user -> user.getValue() > countOfUnverifiedPostsToBan)
                 .map(Map.Entry::getKey)
                 .toList();
+        log.info("Users ids {} sent to be baned", userIdsToBan);
 
         userIdsToBan.forEach(userId -> redisTemplate.convertAndSend(channelTopic.getTopic(), userId.toString()));
         log.info("Information to ban intruders has been sent via redis");
