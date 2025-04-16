@@ -84,7 +84,7 @@ public class PostServiceImpl implements PostService {
     @Override
     public PostDto getPostById(Long postId) {
         return postMapper.toDto(postRepository
-                .findById(postId).orElseThrow(() -> new NotFoundException("The post hasn't been found")));
+                .findByIdWithLikes(postId).orElseThrow(() -> new NotFoundException("The post hasn't been found")));
     }
 
     @Override
@@ -108,16 +108,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public List<PostDto> getAllPublishedPostsByAuthorId(Long authorId) {
-        List<Post> posts = postRepository.findByAuthorId(authorId);
-        return posts.stream()
-                .filter(post -> post.isPublished() && !post.isDeleted())
-                .sorted(Comparator.comparing(Post::getPublishedAt).reversed())
-                .map(postMapper::toDto).toList();
-    }
-
-    @Override
-    public List<PostDto> getAllPublishedPostsByProjectId(Long projectId) {
-        List<Post> posts = postRepository.findByProjectId(projectId);
+        List<Post> posts = postRepository.findByAuthorIdWithLikes(authorId);
         return posts.stream()
                 .filter(post -> post.isPublished() && !post.isDeleted())
                 .sorted(Comparator.comparing(Post::getPublishedAt).reversed())
@@ -126,6 +117,15 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    public List<PostDto> getAllPublishedPostsByProjectId(Long projectId) {
+        List<Post> posts = postRepository.findByProjectIdWithLikes(projectId);
+        return posts.stream()
+                .filter(post -> post.isPublished() && !post.isDeleted())
+                .sorted(Comparator.comparing(Post::getPublishedAt).reversed())
+                .map(postMapper::toDto)
+                .toList();
+    }
+
     public Post getPostEntryById(@Min(1) long id) {
         log.debug("Fetching post with ID: {}", id);
 
