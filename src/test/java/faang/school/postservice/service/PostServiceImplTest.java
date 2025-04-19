@@ -1,7 +1,9 @@
 package faang.school.postservice.service;
 
+import faang.school.postservice.client.UserServiceClient;
 import faang.school.postservice.dto.PostDto;
 import faang.school.postservice.exception.EntityNotFoundException;
+import faang.school.postservice.dto.user.UserDto;
 import faang.school.postservice.exception.NotFoundException;
 import faang.school.postservice.exception.PostNotFoundException;
 import faang.school.postservice.mapper.PostMapperImpl;
@@ -15,19 +17,28 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,8 +50,25 @@ class PostServiceImplTest {
     @Spy
     private PostMapperImpl postMapper;
 
+    @Mock
+    private ThreadPoolTaskScheduler taskScheduler;
+
+    @Mock
+    private PostModerationDictionaryImpl moderationDictionary;
+
+    @Mock
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Mock
+    private ChannelTopic channelTopic;
+
+    @Mock
+    private UserServiceClient userServiceClient;
+
     @InjectMocks
     private PostServiceImpl postService;
+
+    private final int countOfUnverifiedPostsToBan = 2;
 
     private PostDto postDto;
     private Post post;
@@ -68,6 +96,8 @@ class PostServiceImplTest {
     @Test
     public void testCreateDraft() {
         when(postRepository.save(any(Post.class))).thenReturn(post);
+        when(userServiceClient.getUser(postDto.getAuthorId()))
+                .thenReturn(new UserDto(1L, "Rick", "test"));
 
         PostDto result = postService.createDraft(postDto);
 
@@ -113,6 +143,8 @@ class PostServiceImplTest {
                 .build();
 
         when(postRepository.findById(1L)).thenReturn(Optional.of(post));
+        when(userServiceClient.getUser(postDto.getAuthorId()))
+                .thenReturn(new UserDto(1L, "Rick", "test"));
         when(postRepository.save(post)).thenReturn(post);
 
         PostDto result = postService.updatePost(1L, updatedPostDto);
@@ -131,7 +163,8 @@ class PostServiceImplTest {
                 .content("Updated content")
                 .authorId(2L)
                 .build();
-
+        UserDto userDto = new UserDto(2L, "Rick", "test");
+        when(userServiceClient.getUser(2L)).thenReturn(userDto);
         when(postRepository.findById(1L)).thenReturn(Optional.of(post));
 
         assertThrows(IllegalArgumentException.class, () -> postService.updatePost(1L, updatedPostDto));
@@ -240,6 +273,48 @@ class PostServiceImplTest {
     }
 
     @Test
+    public void testModeratePostsWithNoPosts() {
+        ReflectionTestUtils.setField(postService, "limitToModerate", 2);
+        when(postRepository.findUnverifiedPosts(2)).thenReturn(Collections.emptyList());
+
+        postService.moderatePosts();
+
+        verify(postRepository, times(1)).findUnverifiedPosts(2);
+        verifyNoMoreInteractions(postRepository);
+    }
+
+    @Test
+    public void testModeratePostsWithOnePackOfPosts() {
+        ReflectionTestUtils.setField(postService, "limitToModerate", 2);
+        ScheduledExecutorService realExecutor = Executors.newScheduledThreadPool(2);
+        when(taskScheduler.getScheduledExecutor()).thenReturn(realExecutor);
+        when(postRepository.findUnverifiedPosts(2))
+                .thenReturn(List.of(post, post))
+                .thenReturn(Collections.emptyList());
+
+        postService.moderatePosts();
+
+        verify(postRepository, times(2)).findUnverifiedPosts(2);
+        verify(postRepository, times(2)).save(any());
+    }
+
+    @Test
+    public void testModeratePostsWithSomePacksOfPosts() {
+        ReflectionTestUtils.setField(postService, "limitToModerate", 2);
+        ScheduledExecutorService realExecutor = Executors.newScheduledThreadPool(2);
+        when(taskScheduler.getScheduledExecutor()).thenReturn(realExecutor);
+        when(postRepository.findUnverifiedPosts(2))
+                .thenReturn(List.of(post, post))
+                .thenReturn(List.of(post))
+                .thenReturn(Collections.emptyList());
+
+        postService.moderatePosts();
+
+        verify(postRepository, times(3)).findUnverifiedPosts(2);
+        verify(postRepository, times(3)).save(any());
+    }
+
+    @Test
     void testGetPostEntryByIdSuccessfulFetch() {
         long postId = 1L;
         Post post = new Post();
@@ -291,5 +366,25 @@ class PostServiceImplTest {
         postService.removeTagsFromPost(1L, List.of(1L, 2L));
 
         verify(postRepository, times(1)).deleteTagsFromPost(1L, List.of(1L, 2L));
+    }
+
+    @Test
+    public void testBanUserWithTooManyOffendedPostsWithNoRejectedPosts() {
+        when(postRepository.findByVerifiedFalse()).thenReturn(Collections.emptyList());
+
+        postService.banUsersWithTooManyOffendedPosts();
+
+        verify(redisTemplate, never()).convertAndSend(anyString(), any());
+    }
+
+    @Test
+    public void testBanUserWithTooManyOffendedPostsSuccessfully() {
+        post.setAuthorId(1L);
+        when(postRepository.findByVerifiedFalse()).thenReturn(List.of(post, post, post));
+        when(channelTopic.getTopic()).thenReturn("ban-users");
+
+        postService.banUsersWithTooManyOffendedPosts();
+
+        verify(redisTemplate, times(1)).convertAndSend(anyString(), any());
     }
 }
