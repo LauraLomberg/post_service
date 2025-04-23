@@ -36,7 +36,8 @@ public interface PostService {
 
     void removeTagsFromPost(Long postId, List<Long> tagsId);
 
-    void banUsersWithTooManyOffendedPosts();
-
     void moderatePosts();
+
+    void banUsersWithTooManyOffendedPosts();
 }
+

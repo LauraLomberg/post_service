@@ -305,6 +305,19 @@ class PostServiceImplTest {
     }
 
     @Test
+    void testGetPostEntryByIdPostNotFound() {
+        long postId = 2L;
+
+        when(postRepository.findById(postId)).thenReturn(Optional.empty());
+
+        EntityNotFoundException exception = assertThrows(
+                EntityNotFoundException.class,
+                () -> postService.getPostEntryById(postId)
+        );
+        assertEquals("Post not found", exception.getMessage());
+    }
+
+    @Test
     public void testModeratePostsWithNoPosts() {
         ReflectionTestUtils.setField(postService, "limitToModerate", 2);
         when(postRepository.findUnverifiedPosts(2)).thenReturn(Collections.emptyList());
@@ -497,19 +510,6 @@ class PostServiceImplTest {
         assertNotNull(result);
         assertEquals(postId, result.getId());
         verify(postRepository, times(1)).findById(postId);
-    }
-
-    @Test
-    void testGetPostEntryByIdPostNotFound() {
-        long postId = 2L;
-
-        when(postRepository.findById(postId)).thenReturn(Optional.empty());
-
-        EntityNotFoundException exception = assertThrows(
-                EntityNotFoundException.class,
-                () -> postService.getPostEntryById(postId)
-        );
-        assertEquals("Post not found", exception.getMessage());
     }
 
     @Test
