@@ -1,7 +1,4 @@
 spring:
-  multipart:
-    max-file-size: 5
-    max-request-size: 5
   mvc:
     servlet:
       path: /api/v1
@@ -13,8 +10,8 @@ spring:
   servlet:
     multipart:
       enabled: true
-      max-file-size: 10MB
-      max-request-size: 100MB
+      max-file-size: 10485760
+      max-request-size: 104857600
   scheduling:
     thread-name-prefix: scheduler-
     pool:
@@ -22,7 +19,24 @@ spring:
     shutdown:
       await-termination: true
       await-termination-period: 30
-
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: post-feed-consumer-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: '*'
+    listener:
+      ack-mode: manual
+    topic:
+      postCreated:
+        name: posts
+        partition: 3
+        replicationFactor: 1
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
@@ -31,49 +45,28 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
-
   data:
     redis:
-      port: 6379
       host: localhost
+      port: 6379
       channels:
         calculations_channel:
           name: calculations_channel
 
-server:
-  port: 8081
-
-logging:
-  level:
-    root: info
-
 user-service:
   host: localhost
-  port: 8080/api/v1
+  port: 8080
+  base-path: /api/v1
+
 project-service:
   host: localhost
   port: 8082
+
 payment-service:
   host: localhost
   port: 9080
-
-image:
-  processing:
-    max-file-size-mb: 5
-    max-count-per-post: 10
-    resize:
-      horizontal:
-        width: 1080
-        height: 566
-      square:
-        width: 1080
-        height: 1080
-    allowed-content-types:
-      - image/jpeg
-      - image/png
 
 post-service:
   tag:
@@ -85,18 +78,37 @@ post-service:
 
 app:
   scheduling:
-    daily-midnight-cron: "0 0 0 * * ?" # Every day at 00:00
-    daily-one-am-cron: "0 0 1 * * ?" # Every day at 01:00
+    daily-midnight-cron: "0 0 0 * * ?"
+    daily-one-am-cron: "0 0 1 * * ?"
     post:
       max-posts-per-time: 10
   dictionary:
     post-dictionary-path: /dictionary/post-forbidden-words.txt
+  post-cache:
+    ttl-seconds: 86400
+  feed:
+    max-size: 500
 
 s3:
   endpoint: http://localhost:9000
   accessKey: user
   secretKey: password
   bucketName: corpbucket
+
+image:
+  processing:
+    max-file-size-bytes: 5242880
+    max-count-per-post: 10
+    resize:
+      horizontal:
+        width: 1080
+        height: 566
+      square:
+        width: 1080
+        height: 1080
+    allowed-content-types:
+      - image/jpeg
+      - image/png
 
 image-s3:
   resize-sizes:
