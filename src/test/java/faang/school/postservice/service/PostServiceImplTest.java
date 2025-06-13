@@ -20,6 +20,7 @@ import faang.school.postservice.model.Like;
 import faang.school.postservice.model.Post;
 import faang.school.postservice.model.Resource;
 import faang.school.postservice.producer.KafkaPostProducer;
+import faang.school.postservice.repository.AuthorCacheRepository;
 import faang.school.postservice.repository.PostRepository;
 import faang.school.postservice.repository.ResourceRepository;
 import io.minio.MinioClient;
@@ -116,6 +117,8 @@ class PostServiceImplTest {
 
     @Mock
     private Executor postEventExecutor;
+
+    private AuthorCacheRepository authorCacheRepository;
 
     @InjectMocks
     private PostServiceImpl postService;
