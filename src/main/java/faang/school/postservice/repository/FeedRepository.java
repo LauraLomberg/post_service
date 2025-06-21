@@ -3,7 +3,10 @@ package faang.school.postservice.repository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -29,17 +32,25 @@ public class FeedRepository {
         String redisKey = FEED_PREFIX + followerId;
         double score = createdAt.toEpochSecond(ZoneOffset.UTC);
 
-        redisTemplate.opsForZSet().add(redisKey, postId, score);
-        log.debug("Added post {} to feed of follower {} with score {}", postId, followerId, score);
+        redisTemplate.execute(new SessionCallback<>() {
+            @Override
+            public Object execute(RedisOperations operations) throws DataAccessException {
+                operations.watch(redisKey);
 
-        Long feedSize = redisTemplate.opsForZSet().size(redisKey);
-        if (feedSize != null && feedSize > maxFeedSize) {
-            long removeCount = feedSize - maxFeedSize - 1;
-            if (removeCount >= 0) {
-                redisTemplate.opsForZSet().removeRange(redisKey, 0, removeCount);
-                log.debug("Trimmed {} oldest entries from feed of follower {}", removeCount + 1, followerId);
+                operations.multi();
+                operations.opsForZSet().add(redisKey, postId, score);
+                operations.opsForZSet().removeRange(redisKey, 0, -maxFeedSize - 1);
+
+                List<Object> results = operations.exec();
+                if (results == null) {
+                    log.warn("Transaction failed for adding post {} to feed of follower {}", postId, followerId);
+                } else {
+                    log.debug("Added post {} to feed of follower {} with score {} and trimmed to max {}",
+                            postId, followerId, score, maxFeedSize);
+                }
+                return null;
             }
-        }
+        });
     }
 
     public List<Object> getFeed(Long followerId) {

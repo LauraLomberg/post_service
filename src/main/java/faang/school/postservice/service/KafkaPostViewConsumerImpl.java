@@ -27,7 +27,10 @@ public class KafkaPostViewConsumerImpl implements KafkaPostViewConsumer {
     @Value("${app.cache.posts.value}")
     private String postValue;
 
-    @KafkaListener(topics = "${app.cache.authors.key-prefix}", groupId = "${app.cache.consumer.group-id}")
+    @KafkaListener(
+            topics = "${spring.kafka.topic.post-viewed-event.name}",
+            groupId = "${spring.kafka.consumer.group-id}"
+    )
     @Override
     public void consume(PostViewEvent postViewEvent) {
         log.info("Received event: {}", postViewEvent);

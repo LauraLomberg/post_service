@@ -6,16 +6,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -25,50 +27,64 @@ class FeedRepositoryTest {
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
 
-    @Mock
-    private ZSetOperations<String, Object> zSetOps;
-
     @InjectMocks
     private FeedRepository feedRepository;
+
+    private final String redisKey = "feed:1";
+    private final Long followerId = 1L;
+    private final Long postId = 100L;
+    private final LocalDateTime createdAt = LocalDateTime.of(2025, 6, 13, 12, 0);
+    private final double expectedScore = createdAt.toEpochSecond(ZoneOffset.UTC);
 
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(feedRepository, "maxFeedSize", 500);
-        when(redisTemplate.opsForZSet()).thenReturn(zSetOps);
     }
 
     @Test
-    void shouldAddPostAndNotTrimIfSizeIsUnderLimit() {
-        Long followerId = 1L;
-        Long postId = 100L;
-        LocalDateTime createdAt = LocalDateTime.of(2025, 6, 13, 12, 0);
-        double expectedScore = createdAt.toEpochSecond(ZoneOffset.UTC);
+    void shouldAddPostAndTrimInTransaction() {
+        RedisOperations<String, Object> redisOps = mock(RedisOperations.class);
+        ZSetOperations<String, Object> zSetOps = mock(ZSetOperations.class);
 
-        when(zSetOps.size("feed:1")).thenReturn(500L);
+        when(redisTemplate.execute(any(SessionCallback.class))).then(invocation -> {
+            SessionCallback<?> callback = invocation.getArgument(0);
+            return callback.execute(redisOps);
+        });
+
+        when(redisOps.opsForZSet()).thenReturn(zSetOps);
+        when(redisOps.exec()).thenReturn(List.of(1));
 
         feedRepository.addPostToFeed(followerId, postId, createdAt);
 
-        verify(zSetOps).add("feed:1", postId, expectedScore);
-        verify(zSetOps).size("feed:1");
-        verify(zSetOps, never()).removeRange(any(), anyLong(), anyLong());
+        verify(redisOps).watch(redisKey);
+        verify(redisOps).multi();
+        verify(redisOps).exec();
+
+        verify(zSetOps).add(redisKey, postId, expectedScore);
+        verify(zSetOps).removeRange(redisKey, 0, -501);
     }
 
     @Test
-    void shouldTrimFeedIfSizeExceedsLimit() {
-        when(zSetOps.size("feed:1")).thenReturn(510L);
+    void shouldLogWarningWhenTransactionFails() {
+        RedisOperations<String, Object> redisOps = mock(RedisOperations.class);
+        ZSetOperations<String, Object> zSetOps = mock(ZSetOperations.class);
 
-        feedRepository.addPostToFeed(1L, 101L, LocalDateTime.now());
+        when(redisTemplate.execute(any(SessionCallback.class))).then(invocation -> {
+            SessionCallback<?> callback = invocation.getArgument(0);
+            return callback.execute(redisOps);
+        });
 
-        verify(zSetOps).removeRange("feed:1", 0L, 9L);
-    }
+        when(redisOps.opsForZSet()).thenReturn(zSetOps);
+        when(redisOps.exec()).thenReturn(null);
 
-    @Test
-    void shouldNotTrimIfSizeIsNull() {
-        when(zSetOps.size("feed:1")).thenReturn(null);
+        feedRepository.addPostToFeed(followerId, postId, createdAt);
 
-        feedRepository.addPostToFeed(1L, 102L, LocalDateTime.now());
+        verify(redisOps).watch(redisKey);
+        verify(redisOps).multi();
+        verify(redisOps).exec();
 
-        verify(zSetOps, never()).removeRange(any(), anyLong(), anyLong());
+        verify(zSetOps).add(redisKey, postId, expectedScore);
+        verify(zSetOps).removeRange(redisKey, 0, -501);
     }
 }
 

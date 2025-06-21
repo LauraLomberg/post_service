@@ -14,7 +14,7 @@ public class KafkaPostProducerImpl implements KafkaPostProducer {
 
     private final KafkaTemplate<String, PostCreatedEvent> kafkaTemplate;
 
-    @Value("${spring.kafka.topic.postCreated.name}")
+    @Value("${spring.kafka.topic.post-created.name}")
     private String topic;
 
     @Override

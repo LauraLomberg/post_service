@@ -5,6 +5,7 @@ import faang.school.postservice.repository.FeedRepository;
 import faang.school.postservice.repository.PostCacheRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
@@ -16,12 +17,14 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class PostCreatedEventConsumer {
-
     private final FeedRepository feedRepository;
     private final PostCacheRepository postCacheRepository;
 
+    @Value("${ack.nack.delay-seconds}")
+    private long nackDelaySeconds;
+
     @KafkaListener(
-            topics = "${spring.kafka.topic.postCreated.name}",
+            topics = "${spring.kafka.topic.post-created.name}",
             groupId = "${spring.kafka.consumer.group-id}",
             containerFactory = "kafkaListenerContainerFactory"
     )
@@ -46,7 +49,7 @@ public class PostCreatedEventConsumer {
             ack.acknowledge();
         } catch (Exception e) {
             log.error("Error while processing PostCreatedEvent: {}", e.getMessage(), e);
-            ack.nack(Duration.ofSeconds(5));
+            ack.nack(Duration.ofSeconds(nackDelaySeconds));
         }
     }
 }

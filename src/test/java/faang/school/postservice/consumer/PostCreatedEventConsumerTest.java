@@ -85,6 +85,6 @@ class PostCreatedEventConsumerTest {
 
         verify(postCacheRepository).cachePost(event);
         verify(feedRepository, never()).addPostToFeed(anyLong(), anyLong(), any());
-        verify(acknowledgment).nack(Duration.ofSeconds(5));
+        verify(acknowledgment).nack(any(Duration.class));
     }
 }

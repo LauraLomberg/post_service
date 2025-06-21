@@ -118,6 +118,7 @@ class PostServiceImplTest {
     @Mock
     private Executor postEventExecutor;
 
+    @Mock
     private AuthorCacheRepository authorCacheRepository;
 
     @InjectMocks
