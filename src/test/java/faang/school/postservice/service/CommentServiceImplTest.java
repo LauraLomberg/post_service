@@ -13,6 +13,8 @@ import faang.school.postservice.mapper.CommentResponseMapper;
 import faang.school.postservice.model.Comment;
 import faang.school.postservice.model.Post;
 import faang.school.postservice.repository.CommentRepository;
+import faang.school.postservice.event.CommentCreatedEvent;
+import faang.school.postservice.service.publisher.KafkaCommentProducer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +24,7 @@ import org.mockito.Mockito;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
+import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -49,6 +52,9 @@ class CommentServiceImplTest {
 
     @Mock
     private UserServiceClient userServiceClient;
+
+    @Mock
+    private KafkaCommentProducer kafkaCommentProducer;
 
     @Spy
     private CommentCreateMapper commentCreateMapper = Mockito.mock(CommentCreateMapper.class);
@@ -325,5 +331,44 @@ class CommentServiceImplTest {
         assertEquals("Comment not found", exception.getMessage());
 
         verify(commentRepository, never()).deleteById(commentId);
+    }
+
+    @Test
+    void testCreateCommentPublishesEvent() {
+        CommentCreateDto commentCreateDto = new CommentCreateDto();
+        commentCreateDto.setPostId(1L);
+        commentCreateDto.setAuthorId(1L);
+        commentCreateDto.setContent("test content");
+
+        List<Comment> comments = new ArrayList<>();
+        Post post = Post.builder()
+                .id(1L)
+                .comments(comments)
+                .build();
+
+        UserDto userDto = new UserDto(1L, "Leo", "no@null.net");
+        Comment comment = Comment.builder()
+                .id(100L)
+                .post(post)
+                .authorId(1L)
+                .content("test content")
+                .createdAt(LocalDateTime.of(2023, 10, 1, 10, 0))
+                .build();
+
+        when(userServiceClient.getUser(commentCreateDto.getAuthorId())).thenReturn(userDto);
+        when(postService.getPostEntryById(commentCreateDto.getPostId())).thenReturn(post);
+        when(commentCreateMapper.toEntity(commentCreateDto)).thenReturn(comment);
+        when(commentRepository.save(comment)).thenReturn(comment);
+
+        commentService.createComment(commentCreateDto);
+
+        ArgumentCaptor<CommentCreatedEvent> eventCaptor = ArgumentCaptor.forClass(CommentCreatedEvent.class);
+        verify(kafkaCommentProducer, times(1)).sendCommentCreatedEvent(eventCaptor.capture());
+        CommentCreatedEvent event = eventCaptor.getValue();
+        assertEquals(comment.getId(), event.getCommentId());
+        assertEquals(comment.getPost().getId(), event.getPostId());
+        assertEquals(comment.getAuthorId(), event.getAuthorId());
+        assertEquals(comment.getContent(), event.getContent());
+        assertEquals(comment.getCreatedAt(), event.getCreatedAt());
     }
 }

@@ -40,6 +40,10 @@ kafka:
       name: "post-viewed-event"
       partition: 1
       replicationFactor: 1
+    comments:
+      name: "comments"
+      partition: 1
+      replicationFactor: 1
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
