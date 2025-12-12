@@ -33,6 +33,21 @@ spring:
       retries: 3
       batch-size: 16384
       buffer-memory: 33554432
+    consumer:
+      group-id: post-feed-consumer-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+    listener:
+      ack-mode: manual
+    topic:
+      post-created:
+        name: posts
+        partition: 3
+        replication-factor: 1
+      post-viewed-event:
+        name: post-viewed-event
+        partition: 1
+        replication-factor: 1
 
 kafka:
   topic:
@@ -74,7 +89,9 @@ logging:
 
 user-service:
   host: localhost
-  port: 8080/api/v1
+  port: 8080
+  base-path: /api/v1
+
 project-service:
   host: localhost
   port: 8082
@@ -104,6 +121,10 @@ post-service:
     count-of-unverified-posts-to-ban: 5
   redis:
     ban-user-key: user_ban
+  async:
+    core-pool-size: 4
+    max-pool-size: 8
+    queue-capacity: 100
 
 app:
   scheduling:
@@ -113,6 +134,10 @@ app:
       max-posts-per-time: 10
   dictionary:
     post-dictionary-path: /dictionary/post-forbidden-words.txt
+  post-cache:
+    ttl-seconds: 86400
+  feed:
+    max-size: 500
   cache:
     authors:
       ttl: 86400 #24 hours
@@ -121,8 +146,10 @@ app:
       ttl: 86400
       key-prefix: "posts"
       value: "views"
-    consumer:
-      group-id: post-view-consumers
+
+ack:
+  nack:
+    delay-seconds: 5
 
 s3:
   endpoint: http://localhost:9000

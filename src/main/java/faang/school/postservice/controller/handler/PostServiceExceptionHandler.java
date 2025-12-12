@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 public class PostServiceExceptionHandler {
 
-    @Value("${spring.multipart.max-request-size}")
+    @Value("${spring.servlet.multipart.max-request-size}")
     private long maxRequestSize;
 
     @ExceptionHandler(FileValidationException.class)

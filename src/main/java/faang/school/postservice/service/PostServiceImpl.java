@@ -2,7 +2,10 @@ package faang.school.postservice.service;
 
 import faang.school.postservice.client.ProjectServiceClient;
 import faang.school.postservice.client.UserServiceClient;
+import faang.school.postservice.dto.FollowerResponseDto;
+import faang.school.postservice.dto.PostCreatedEvent;
 import faang.school.postservice.dto.PostDto;
+import faang.school.postservice.dto.UserFilterRequestDto;
 import faang.school.postservice.dto.user.UserDto;
 import faang.school.postservice.exception.EntityNotFoundException;
 import faang.school.postservice.exception.FileUploadException;
@@ -10,6 +13,7 @@ import faang.school.postservice.exception.NotFoundException;
 import faang.school.postservice.exception.PostNotFoundException;
 import faang.school.postservice.mapper.PostMapper;
 import faang.school.postservice.model.Post;
+import faang.school.postservice.producer.KafkaPostProducer;
 import faang.school.postservice.repository.AuthorCacheRepository;
 import faang.school.postservice.repository.PostRepository;
 import io.minio.BucketExistsArgs;
@@ -20,10 +24,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -47,7 +49,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import java.util.Optional;
 import javax.imageio.ImageIO;
@@ -77,6 +79,11 @@ public class PostServiceImpl implements PostService {
     private final PostModerationDictionaryImpl moderationDictionary;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ChannelTopic channelTopic;
+    private final KafkaPostProducer kafkaPostProducer;
+    private final ImageProcessingProperties properties;
+    private final ImageResizer imageResizer;
+    private final MinioClient minioClient;
+    private final Executor postEventExecutor;
     private final AuthorCacheRepository authorCacheRepository;
 
     @Value("${app.scheduling.post.max-posts-per-time}")
@@ -84,24 +91,26 @@ public class PostServiceImpl implements PostService {
 
     @Value("${post-service.post.count-of-unverified-posts-to-ban}")
     private int countOfUnverifiedPostsToBan;
-    private final ImageProcessingProperties properties;
-    private final ImageResizer imageResizer;
-    private final MinioClient minioClient;
+
     @Value("${s3.bucket-name}")
     private String bucketName;
 
     @PostConstruct
     public void init() {
         try {
-            boolean isExist = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build());
+            boolean isExist = minioClient.bucketExists(
+                    BucketExistsArgs.builder().bucket(bucketName).build()
+            );
             if (!isExist) {
-                minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
+                minioClient.makeBucket(
+                        MakeBucketArgs.builder().bucket(bucketName).build()
+                );
                 log.info("Bucket '{}' created successfully", bucketName);
             } else {
                 log.info("Bucket '{}' already exists", bucketName);
             }
         } catch (Exception e) {
-            log.error("Error while initializing MinIO bucket: {}", e.getMessage());
+            log.error("Error while initializing MinIO bucket: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to initialize MinIO bucket", e);
         }
     }
@@ -118,15 +127,51 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public PostDto publishPost(Long postId) {
-        Post post = postRepository.findById(postId).orElseThrow(() -> new NotFoundException(POST_NOT_EXIST));
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException(POST_NOT_EXIST));
+
         if (post.isPublished()) {
             throw new IllegalStateException("Post is already published");
         }
+
         post.setPublished(true);
         post.setPublishedAt(LocalDateTime.now());
         post = postRepository.save(post);
+
+        publishPostEvent(post);
+
         authorCacheRepository.saveAuthor(postId, post.getAuthorId());
+
         return postMapper.toDto(post);
+    }
+
+    private void publishPostEvent(Post post) {
+        Long authorId = post.getAuthorId();
+
+        CompletableFuture
+                .supplyAsync(() -> userServiceClient.getFollowers(
+                        authorId,
+                        new UserFilterRequestDto(null, null, null, null)
+                ), postEventExecutor)
+                .thenAccept(followers -> {
+                    List<Long> followerIds = followers.stream()
+                            .map(FollowerResponseDto::id)
+                            .toList();
+
+                    PostCreatedEvent event = PostCreatedEvent.builder()
+                            .postId(post.getId())
+                            .authorId(authorId)
+                            .createdAt(post.getPublishedAt())
+                            .followerIds(followerIds)
+                            .build();
+
+                    kafkaPostProducer.sendPostCreatedEvent(event);
+                })
+                .exceptionally(ex -> {
+                    log.error("Failed to fetch followers or send post event for postId={}: {}",
+                            post.getId(), ex.getMessage(), ex);
+                    return null;
+                });
     }
 
     @Override

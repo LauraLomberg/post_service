@@ -22,10 +22,11 @@ public class PostServiceConfig {
     private String accessKey;
     @Value("${s3.secretKey}")
     private String secretKey;
-    @Value("${spring.multipart.max-file-size}")
-    private long maxFileSize;
-    @Value("${spring.multipart.max-request-size}")
-    private long maxRequestSize;
+    @Value("${spring.servlet.multipart.max-file-size}")
+    private DataSize maxFileSize;
+
+    @Value("${spring.servlet.multipart.max-request-size}")
+    private DataSize maxRequestSize;
 
     @Bean
     public S3Client s3Client() {
@@ -40,8 +41,8 @@ public class PostServiceConfig {
     @Bean
     public MultipartConfigElement multipartConfigElement() {
         MultipartConfigFactory factory = new MultipartConfigFactory();
-        factory.setMaxFileSize(DataSize.ofMegabytes(maxFileSize));
-        factory.setMaxRequestSize(DataSize.ofMegabytes(maxRequestSize));
+        factory.setMaxFileSize(maxFileSize);
+        factory.setMaxRequestSize(maxRequestSize);
         return factory.createMultipartConfig();
     }
 }

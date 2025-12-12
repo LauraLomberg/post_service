@@ -1,11 +1,15 @@
 package faang.school.postservice.service;
 
+import faang.school.postservice.client.ProjectServiceClient;
 import faang.school.postservice.config.image.ImageDimensions;
 import faang.school.postservice.config.image.ImageProcessingProperties;
 import faang.school.postservice.config.image.ImageResizeProperties;
 import faang.school.postservice.client.UserServiceClient;
+import faang.school.postservice.dto.FollowerResponseDto;
+import faang.school.postservice.dto.PostCreatedEvent;
 import faang.school.postservice.dto.PostDto;
 import faang.school.postservice.dto.ResourceDto;
+import faang.school.postservice.dto.UserFilterRequestDto;
 import faang.school.postservice.exception.EntityNotFoundException;
 import faang.school.postservice.dto.user.UserDto;
 import faang.school.postservice.exception.NotFoundException;
@@ -15,6 +19,7 @@ import faang.school.postservice.mapper.ResourceMapperImpl;
 import faang.school.postservice.model.Like;
 import faang.school.postservice.model.Post;
 import faang.school.postservice.model.Resource;
+import faang.school.postservice.producer.KafkaPostProducer;
 import faang.school.postservice.repository.AuthorCacheRepository;
 import faang.school.postservice.repository.PostRepository;
 import faang.school.postservice.repository.ResourceRepository;
@@ -33,7 +38,6 @@ import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
@@ -42,9 +46,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -54,6 +60,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -99,6 +107,18 @@ class PostServiceImplTest {
     private UserServiceClient userServiceClient;
 
     @Mock
+    private KafkaPostProducer kafkaProducer;
+
+    @Mock
+    private ProjectServiceClient projectServiceClient;
+
+    @Mock
+    private ImageResizer imageResizer;
+
+    @Mock
+    private Executor postEventExecutor;
+
+    @Mock
     private AuthorCacheRepository authorCacheRepository;
 
     @InjectMocks
@@ -108,6 +128,7 @@ class PostServiceImplTest {
 
     private PostDto postDto;
     private Post post;
+    private List<FollowerResponseDto> followers;
 
     @BeforeEach
     public void setUp() {
@@ -127,22 +148,11 @@ class PostServiceImplTest {
                 .deleted(false)
                 .createdAt(LocalDateTime.now())
                 .build();
-    }
 
-    @Test
-    public void testCreateDraft() {
-        when(postRepository.save(any(Post.class))).thenReturn(post);
-        when(userServiceClient.getUser(postDto.getAuthorId()))
-                .thenReturn(new UserDto(1L, "Rick", "test"));
-
-        PostDto result = postService.createDraft(postDto);
-
-        assertNotNull(result);
-        assertEquals(postDto.getContent(), result.getContent());
-        assertEquals(postDto.getAuthorId(), result.getAuthorId());
-        verify(postMapper).toEntity(postDto);
-        verify(postRepository).save(any(Post.class));
-        verify(postMapper).toDto(post);
+        followers = Arrays.asList(
+                new FollowerResponseDto(2L, "follower1", "follower1@test.com"),
+                new FollowerResponseDto(3L, "follower2", "follower2@test.com")
+        );
     }
 
     @Test
@@ -168,6 +178,93 @@ class PostServiceImplTest {
         assertThrows(IllegalStateException.class, () -> postService.publishPost(1L));
         verify(postRepository).findById(1L);
         verify(postRepository, never()).save(post);
+    }
+
+    @Test
+    void testPublishPostWithEventSending() throws InterruptedException {
+        ReflectionTestUtils.setField(postService, "postEventExecutor", (Executor) Runnable::run);
+
+        when(postRepository.findById(1L)).thenReturn(Optional.of(post));
+        when(postRepository.save(post)).thenReturn(post);
+        when(userServiceClient.getFollowers(eq(1L), any())).thenReturn(followers);
+
+        PostDto result = postService.publishPost(1L);
+
+        assertNotNull(result);
+        assertTrue(post.isPublished());
+        assertNotNull(post.getPublishedAt());
+
+        verify(kafkaProducer).sendPostCreatedEvent(argThat(event ->
+                event.getPostId().equals(1L) &&
+                        event.getAuthorId().equals(1L) &&
+                        event.getFollowerIds().containsAll(List.of(2L, 3L))
+        ));
+    }
+
+    @Test
+    void testPublishPostEventWithEmptyFollowers() {
+        ReflectionTestUtils.setField(postService, "postEventExecutor", (Executor) Runnable::run);
+
+        when(postRepository.findById(1L)).thenReturn(Optional.of(post));
+        when(postRepository.save(post)).thenReturn(post);
+        when(userServiceClient.getFollowers(eq(1L), any(UserFilterRequestDto.class)))
+                .thenReturn(Collections.emptyList());
+
+        PostDto result = postService.publishPost(1L);
+
+        assertNotNull(result);
+        assertTrue(post.isPublished());
+
+        verify(kafkaProducer).sendPostCreatedEvent(argThat(event ->
+                event.getPostId().equals(1L) &&
+                        event.getAuthorId().equals(1L) &&
+                        event.getFollowerIds().isEmpty()
+        ));
+    }
+
+    @Test
+    void testPublishPostEventWithUserServiceException() throws InterruptedException {
+        Post post = new Post();
+        post.setId(1L);
+        post.setAuthorId(42L);
+        post.setPublished(false);
+
+        when(postRepository.findById(1L)).thenReturn(Optional.of(post));
+        when(postRepository.save(post)).thenReturn(post);
+
+        PostDto result = postService.publishPost(1L);
+
+        assertNotNull(result);
+        assertTrue(post.isPublished());
+
+        Thread.sleep(100);
+
+        verify(kafkaProducer, never()).sendPostCreatedEvent(any(PostCreatedEvent.class));
+    }
+
+    @Test
+    public void testPublishPostNotFound() {
+        when(postRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> postService.publishPost(1L));
+        verify(postRepository).findById(1L);
+        verify(postRepository, never()).save(any(Post.class));
+    }
+
+    @Test
+    public void testCreateDraft() {
+        when(postRepository.save(any(Post.class))).thenReturn(post);
+        when(userServiceClient.getUser(postDto.getAuthorId()))
+                .thenReturn(new UserDto(1L, "Rick", "test"));
+
+        PostDto result = postService.createDraft(postDto);
+
+        assertNotNull(result);
+        assertEquals(postDto.getContent(), result.getContent());
+        assertEquals(postDto.getAuthorId(), result.getAuthorId());
+        verify(postMapper).toEntity(postDto);
+        verify(postRepository).save(any(Post.class));
+        verify(postMapper).toDto(post);
     }
 
     @Test

@@ -16,7 +16,7 @@ public class KafkaPostViewProducerImpl implements KafkaPostViewProducer {
 
     private final KafkaTemplate<String, PostViewEvent> kafkaTemplate;
 
-    @Value("${kafka.topic.post-viewed-event.name}")
+    @Value("${spring.kafka.topic.post-viewed-event.name}")
     private String topic;
 
     @Override
