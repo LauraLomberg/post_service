@@ -1,4 +1,7 @@
 spring:
+  multipart:
+    max-file-size: 5
+    max-request-size: 5
   mvc:
     servlet:
       path: /api/v1
@@ -10,8 +13,8 @@ spring:
   servlet:
     multipart:
       enabled: true
-      max-file-size: 10485760
-      max-request-size: 104857600
+      max-file-size: 10MB
+      max-request-size: 100MB
   scheduling:
     thread-name-prefix: scheduler-
     pool:
@@ -46,6 +49,17 @@ spring:
         partition: 1
         replication-factor: 1
 
+kafka:
+  topic:
+    post-viewed-event:
+      name: "post-viewed-event"
+      partition: 1
+      replicationFactor: 1
+    comments:
+      name: "comments"
+      partition: 1
+      replicationFactor: 1
+
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
@@ -54,15 +68,24 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+
   data:
     redis:
-      host: localhost
       port: 6379
+      host: localhost
       channels:
         calculations_channel:
           name: calculations_channel
+
+server:
+  port: 8081
+
+logging:
+  level:
+    root: info
 
 user-service:
   host: localhost
@@ -72,10 +95,24 @@ user-service:
 project-service:
   host: localhost
   port: 8082
-
 payment-service:
   host: localhost
   port: 9080
+
+image:
+  processing:
+    max-file-size-mb: 5
+    max-count-per-post: 10
+    resize:
+      horizontal:
+        width: 1080
+        height: 566
+      square:
+        width: 1080
+        height: 1080
+    allowed-content-types:
+      - image/jpeg
+      - image/png
 
 post-service:
   tag:
@@ -91,8 +128,8 @@ post-service:
 
 app:
   scheduling:
-    daily-midnight-cron: "0 0 0 * * ?"
-    daily-one-am-cron: "0 0 1 * * ?"
+    daily-midnight-cron: "0 0 0 * * ?" # Every day at 00:00
+    daily-one-am-cron: "0 0 1 * * ?" # Every day at 01:00
     post:
       max-posts-per-time: 10
   dictionary:
@@ -103,7 +140,7 @@ app:
     max-size: 500
   cache:
     authors:
-      ttl: 86400
+      ttl: 86400 #24 hours
       key-prefix: "post-authors"
     posts:
       ttl: 86400
@@ -119,21 +156,6 @@ s3:
   accessKey: user
   secretKey: password
   bucketName: corpbucket
-
-image:
-  processing:
-    max-file-size-bytes: 5242880
-    max-count-per-post: 10
-    resize:
-      horizontal:
-        width: 1080
-        height: 566
-      square:
-        width: 1080
-        height: 1080
-    allowed-content-types:
-      - image/jpeg
-      - image/png
 
 image-s3:
   resize-sizes:

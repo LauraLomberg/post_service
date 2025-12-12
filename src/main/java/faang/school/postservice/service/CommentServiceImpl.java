@@ -5,6 +5,7 @@ import faang.school.postservice.dto.comment.CommentCreateDto;
 import faang.school.postservice.dto.comment.CommentResponseDto;
 import faang.school.postservice.dto.comment.CommentUpdateDto;
 import faang.school.postservice.dto.user.UserDto;
+import faang.school.postservice.event.CommentCreatedEvent;
 import faang.school.postservice.exception.DataValidationException;
 import faang.school.postservice.exception.EntityNotFoundException;
 import faang.school.postservice.exception.NotFoundException;
@@ -13,6 +14,7 @@ import faang.school.postservice.mapper.CommentResponseMapper;
 import faang.school.postservice.model.Comment;
 import faang.school.postservice.model.Post;
 import faang.school.postservice.repository.CommentRepository;
+import faang.school.postservice.service.publisher.KafkaCommentProducer;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,7 @@ public class CommentServiceImpl implements CommentService {
     private final CommentResponseMapper commentResponseMapper;
     private final PostService postService;
     private final UserServiceClient userServiceClient;
+    private final KafkaCommentProducer kafkaCommentProducer;
 
     @Override
     public long createComment(CommentCreateDto commentCreateDto) {
@@ -61,6 +64,15 @@ public class CommentServiceImpl implements CommentService {
         log.debug("Saving {} to the database", comment);
         Comment returnedComment = commentRepository.save(comment);
         log.debug("{} successfully saved to the database", comment);
+
+        CommentCreatedEvent event = CommentCreatedEvent.builder()
+                .commentId(returnedComment.getId())
+                .postId(returnedComment.getPost().getId())
+                .authorId(returnedComment.getAuthorId())
+                .content(returnedComment.getContent())
+                .createdAt(returnedComment.getCreatedAt())
+                .build();
+        kafkaCommentProducer.sendCommentCreatedEvent(event);
 
         return returnedComment.getId();
     }
